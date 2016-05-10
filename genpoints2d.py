@@ -1,18 +1,16 @@
+import argparse
 import math
-import matplotlib.pyplot as plt
 import random
 import struct
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
 # The origin point, x = y = 0.
 ORIGIN = (0.0,0.0,0.0)
 
-MAX_X_COORDINATE = 1000
-MAX_Y_COORDINATE = 1000
-
-POINTS_TO_GENERATE = 100*1000*1000
-# Indicate the number of clusters K. A value of zero or less will trigger a
-# uniform distribution.
-CLUSTER_NO = 4
 # Level of diffusion around a cluster centroid.
 DIFFUSION = 100
 
@@ -26,14 +24,12 @@ DEFAULT_CLUSTER_NO = len(DEFAULT_CENTROID_LIST)
 DEFAULT_OUTPUT_FILE = 'test.dat'
 
 USE_DEFAULT_CENTROIDS = False
-DO_PLOT = False
 
 
 def dist2d(a, b):
     return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
-def gen_point2d(diffusion, max_x=MAX_X_COORDINATE,
-                          max_y=MAX_Y_COORDINATE):
+def gen_point2d(diffusion, max_x, max_y):
     """Generate a single centroid. A centroid may not be too close to the
     maximum value of the dimension, no closer than 2*diffusion"""
     return (random.uniform(2*diffusion, max_x-2*diffusion),
@@ -46,61 +42,95 @@ def gen_point_from_centroid2d(centroid, diffusion):
     y =  random.uniform(centroid[1] - diffusion, centroid[1] + diffusion)
     return (x,y,0.0)
 
-def centroidgen2d(clusters, diffusion,
-                  max_x=MAX_X_COORDINATE, max_y=MAX_Y_COORDINATE):
+def centroidgen2d(clusters, diffusion, max_x, max_y):
     """Generate centroids for each cluster. Each centroid must be at least
     2*diffusion away from all others."""
     # TODO: this is a brute force solution, may need to optimize.
     centroids = []
     for _ in xrange(clusters):
-        centroid = gen_point2d(diffusion)
+        centroid = gen_point2d(diffusion, max_x, max_y)
         for other_centroid in centroids:
             while (dist2d(centroid, other_centroid) < 2 * diffusion):
-                centroid = gen_point2d(diffusion)
+                centroid = gen_point2d(diffusion, max_x, max_y)
         centroids.append(centroid)
     return centroids
 
-def pointgen2d(num=POINTS_TO_GENERATE, clusters=CLUSTER_NO,
-               max_x=MAX_X_COORDINATE, max_y=MAX_Y_COORDINATE,
-               diffusion=DIFFUSION):
+def pointgen2d(num, diffusion, clusters, max_x, max_y, std_pattern=False):
     """Generate a vector list of random (x,y,0) points. The values x and y are
     bounded by max_x and max_y values. If the number of clusters is > 0 then
     the values will be clustered into that many random groups with the
     specified level of diffusion."""
 
-    if USE_DEFAULT_CENTROIDS:
+    if std_pattern:
         centroids = DEFAULT_CENTROID_LIST
     else:
-        centroids = centroidgen2d(CLUSTER_NO, DIFFUSION)
+        centroids = centroidgen2d(clusters, diffusion, max_x, max_y)
 
-    if (clusters > 0):
+    if (len(centroids) > 0):
         points = [gen_point_from_centroid2d(
-                  centroids[i%len(centroids)], DIFFUSION) 
+                  centroids[i%len(centroids)], diffusion) 
                   for i in xrange(num)]
     else:
-        points = [gen_point2d(DIFFUSION) for i in xrange(num)]
+        points = [gen_point2d(diffusion, max_x, max_y) for i in xrange(num)]
     return (points, centroids)
-
-def test_print():
-    points, centroids = pointgen2d(num=100)
-    for ci, centroid in enumerate(centroids):
-        print ci, ': ', centroid
-        print '---------------------'
-        for p in points[ci::CLUSTER_NO]:
-            print p
-        print '---------------------'
 
 def plot_points(points):
     xs, ys, zs = zip(*points)
     plt.scatter(xs, ys)
     plt.show()
 
+def check_neg(v):
+    lv = int(v)
+    if (lv < 0):
+        raise argparse.ArgumentTypeError("%s is an invalid positive integer"
+                                         % v)
+    return lv
+
+def arg_parsing():
+    description_string = """Generate a 2d list of points that can be spread
+                            into clusters. Points are stored as double
+                            precision values in (x,y,cl) format, where cl is
+                            the assigned cluser number or zero."""
+    parser = argparse.ArgumentParser(description=description_string)
+    parser.add_argument('num_points', metavar='N', type=check_neg,
+                       help='Number of 2d points to be generated.')
+    parser.add_argument('--clusters','-c', action='store', dest='num_clusters',
+                        type=check_neg, default=0, metavar='K',
+                        help='Number of clusters to create.')
+    parser.add_argument('--std-pattern', action='store_true',
+                        dest='std_pattern',
+                        help='Use a standard pattern of 4 clusters. May not\
+                        be used with -c.')
+    parser.add_argument('--plot', '-p', action='store_true', dest='do_plot',
+                        help='Plot the values upon generating.')
+    parser.add_argument('-o', dest='output_file', action='store',
+                        default=DEFAULT_OUTPUT_FILE,
+                        help='Output file name.')
+    parser.add_argument('--diffusion','-D', action='store', dest='diffusion',
+                        type=check_neg, default=DIFFUSION, metavar='K',
+                        help='Maximum dispersal from centroid center.')
+    parser.add_argument('--max', action='store', dest='max_coords', nargs=2,
+                        type=check_neg,
+                        default=[DEFAULT_MAX_X_COORDINATE,
+                                 DEFAULT_MAX_Y_COORDINATE],
+                        help='Max values for X and Y axis')
+    args = parser.parse_args()
+    if (args.std_pattern and args.num_clusters):
+        raise ValueError('You may not specify the number of clusters for stan\
+                         dard patterns')
+    return args
+
 def main():
-    points, centroids = pointgen2d()
-    if DO_PLOT:
+    args = arg_parsing()
+    points, centroids = pointgen2d(num=args.num_points,
+                                   clusters=args.num_clusters,
+                                   diffusion=args.diffusion,
+                                   std_pattern=args.std_pattern,
+                                   max_x=args.max_coords[0],
+                                   max_y=args.max_coords[1])
+    if (plt and args.do_plot):
         plot_points(points)
-    out_file_name = DEFAULT_OUTPUT_FILE
-    out_file = open(out_file_name, 'wb')
+    out_file = open(args.output_file, 'wb')
     for point in points:
         out_file.write(struct.pack('d'*len(point), *point))
     out_file.close()
