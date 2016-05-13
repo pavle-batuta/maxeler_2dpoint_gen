@@ -29,18 +29,19 @@ USE_DEFAULT_CENTROIDS = False
 def dist2d(a, b):
     return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
-def gen_point2d(diffusion, max_x, max_y):
+def gen_point2d(diffusion, max_x, max_y, z_payload=0.0):
     """Generate a single centroid. A centroid may not be too close to the
     maximum value of the dimension, no closer than 2*diffusion"""
     return (random.uniform(2*diffusion, max_x-2*diffusion),
-            random.uniform(2*diffusion, max_y-2*diffusion), 0.0)
+            random.uniform(2*diffusion, max_y-2*diffusion), z_payload)
 
 def gen_point_from_centroid2d(centroid, diffusion):
     """Generate a single (x,y,0.0) point centered around a centroid. """
     # TODO: refactor
     x =  random.uniform(centroid[0] - diffusion, centroid[0] + diffusion)
     y =  random.uniform(centroid[1] - diffusion, centroid[1] + diffusion)
-    return (x,y,0.0)
+    z_payload = centroid[2]  # Get the Z payload from the centroid.
+    return (x,y,z_payload)
 
 def centroidgen2d(clusters, diffusion, max_x, max_y):
     """Generate centroids for each cluster. Each centroid must be at least
@@ -51,7 +52,8 @@ def centroidgen2d(clusters, diffusion, max_x, max_y):
         centroid = gen_point2d(diffusion, max_x, max_y)
         for other_centroid in centroids:
             while (dist2d(centroid, other_centroid) < 2 * diffusion):
-                centroid = gen_point2d(diffusion, max_x, max_y)
+                centroid = gen_point2d(diffusion, max_x, max_y,
+                                       z_payload=float(i))
         centroids.append(centroid)
     return centroids
 
@@ -107,7 +109,7 @@ def arg_parsing():
                         default=DEFAULT_OUTPUT_FILE,
                         help='Output file name.')
     parser.add_argument('--diffusion','-D', action='store', dest='diffusion',
-                        type=check_neg, default=DIFFUSION, metavar='K',
+                        type=check_neg, default=DIFFUSION,
                         help='Maximum dispersal from centroid center.')
     parser.add_argument('--max', action='store', dest='max_coords', nargs=2,
                         type=check_neg,
