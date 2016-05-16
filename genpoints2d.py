@@ -3,6 +3,8 @@ import math
 import random
 import struct
 
+from itertools import izip
+
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -77,7 +79,7 @@ def pointgen2d(num, diffusion, clusters, max_x, max_y, std_pattern=False):
     return (points, centroids)
 
 def plot_points(points):
-    xs, ys, zs = zip(*points)
+    xs, ys, zs = izip(*points)
     plt.scatter(xs, ys)
     plt.show()
 
@@ -101,8 +103,8 @@ def arg_parsing():
                         help='Number of clusters to create.')
     parser.add_argument('--std-pattern', action='store_true',
                         dest='std_pattern',
-                        help='Use a standard pattern of 4 clusters. May not\
-                        be used with -c.')
+                        help="""Use a standard pattern of 4 clusters. May not
+                        be used with -c.""")
     parser.add_argument('--plot', '-p', action='store_true', dest='do_plot',
                         help='Plot the values upon generating.')
     parser.add_argument('-o', dest='output_file', action='store',
@@ -118,8 +120,8 @@ def arg_parsing():
                         help='Max values for X and Y axis')
     args = parser.parse_args()
     if (args.std_pattern and args.num_clusters):
-        raise ValueError('You may not specify the number of clusters for stan\
-                         dard patterns')
+        raise ValueError("""You may not specify the number of clusters for
+                         standard patterns""")
     return args
 
 def main():
